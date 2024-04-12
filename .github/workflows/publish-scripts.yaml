@@ -1,0 +1,43 @@
+name: Publish scripts
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/**
+   
+jobs:
+  publish-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: cat .github/manifest-template.json
+
+      - name: Get changed files in the docs folder
+        id: changed-files-specific
+        uses: tj-actions/changed-files@v44
+        with:
+          files: scripts/**
+          
+      - name: Run step if any file(s) in the docs folder change
+        if: steps.changed-files-specific.outputs.any_changed == 'true'
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files-specific.outputs.added_files }}
+        run: |
+          for file_path in ${ALL_CHANGED_FILES}; do
+            file_name=$(echo $file_path | awk -F'/' '{print $NF}')
+            only_name=$(echo "${file_name%%.*}" )
+            bucket_path="bucket/$only_name.json"
+
+
+            cp .github/manifest-template.json $bucket_path
+            sed "s/{{filename}}/${file_name}/g" .github/manifest-template.json > $bucket_path
+          done
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+
+          git add .
+          git status
+
+          git commit -m "add new scripts manifests"
+          git push origin main
